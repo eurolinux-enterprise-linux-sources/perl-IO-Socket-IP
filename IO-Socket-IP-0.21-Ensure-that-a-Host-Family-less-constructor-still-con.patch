@@ -1,0 +1,104 @@
+From d6a3ed8299ac6d5cac8db2e0f8e438dcfb8964a2 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Petr=20P=C3=ADsa=C5=99?= <ppisar@redhat.com>
+Date: Mon, 18 Sep 2017 17:21:26 +0200
+Subject: [PATCH] Ensure that a Host/Family-less constructor still constructs a
+ socket
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+An upstream fix ported from 0.25 version to 0.21:
+
+0.25    2014/01/11 17:19:29
+        [BUGFIXES]
+         * Ensure that a Host/Family-less constructor still constructs a
+           socket, by using gai()s AI_ADDRCONFIG hint
+
+CPAN RT#91982
+
+Signed-off-by: Petr Písař <ppisar@redhat.com>
+---
+ README              |  6 ++++++
+ lib/IO/Socket/IP.pm | 22 +++++++++++++++++++++-
+ t/19no-addrs.t      |  9 +++++++++
+ 3 files changed, 36 insertions(+), 1 deletion(-)
+
+diff --git a/README b/README
+index 32ccc65..d09fe2b 100644
+--- a/README
++++ b/README
+@@ -189,6 +189,12 @@ CONSTRUCTORS
+     compatibility with `IO::Socket::INET'. Other named arguments that are
+     not recognised are ignored.
+ 
++    If neither `Family' nor any hosts or addresses are passed, nor any
++    `*AddrInfo', then the constructor has no information on which to decide
++    a socket family to create. In this case, it performs a `getaddinfo' call
++    with the `AI_ADDRCONFIG' flag, no host name, and a service name of
++    `"0"', and uses the family of the first returned result.
++
+     If the constructor fails, it will set `$@' to an appropriate error
+     message; this may be from `$!' or it may be some other string; not every
+     failure necessarily has an associated `errno' value.
+diff --git a/lib/IO/Socket/IP.pm b/lib/IO/Socket/IP.pm
+index cc9c350..208d837 100644
+--- a/lib/IO/Socket/IP.pm
++++ b/lib/IO/Socket/IP.pm
+@@ -311,6 +311,12 @@ C<SOCK_STREAM> and C<IPPROTO_TCP> respectively will be set, to maintain
+ compatibility with C<IO::Socket::INET>. Other named arguments that are not
+ recognised are ignored.
+ 
++If neither C<Family> nor any hosts or addresses are passed, nor any
++C<*AddrInfo>, then the constructor has no information on which to decide a
++socket family to create. In this case, it performs a C<getaddinfo> call with
++the C<AI_ADDRCONFIG> flag, no host name, and a service name of C<"0">, and
++uses the family of the first returned result.
++
+ If the constructor fails, it will set C<$@> to an appropriate error message;
+ this may be from C<$!> or it may be some other string; not every failure
+ necessarily has an associated C<errno> value.
+@@ -512,8 +518,22 @@ sub _configure
+       }
+    }
+ 
+-   if( !@infos and defined $hints{family} ) {
++   if( !@infos ) {
++
+       # If there was a Family hint then create a plain unbound, unconnected socket
++      # If there wasn't, use getaddrinfo()'s AI_ADDRCONFIG side-effect to guess a
++      # suitable family first.
++      if( !defined $hints{family} ) {
++         my ( $err, $addrinfo ) = getaddrinfo( "", "0", \%hints );
++         if( $err ) {
++            $@ = "$err";
++            $! = EINVAL;
++            return;
++         }
++
++         $hints{family} = $addrinfo->{family};
++      }
++
+       @infos = ( {
+          family   => $hints{family},
+          socktype => $hints{socktype},
+diff --git a/t/19no-addrs.t b/t/19no-addrs.t
+index 65716cf..0ccb84f 100644
+--- a/t/19no-addrs.t
++++ b/t/19no-addrs.t
+@@ -33,4 +33,13 @@ SKIP: {
+    is( $sock->socktype, SOCK_STREAM, '$sock->socktype for Family => AF_INET6' );
+ }
+ 
++# Lack of even a Family hint - _a_ socket is created but we don't guarantee
++# what family
++{
++   my $sock = IO::Socket::IP->new( Type => SOCK_STREAM );
++
++   ok( defined $sock->fileno, '$sock->fileno for Type => SOCK_STREAM' );
++   is( $sock->socktype, SOCK_STREAM, '$sock->socktype for Type => SOCK_STREAM' );
++}
++
+ done_testing;
+-- 
+2.13.5
+

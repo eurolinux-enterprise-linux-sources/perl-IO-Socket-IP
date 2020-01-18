@@ -1,12 +1,18 @@
 Name:           perl-IO-Socket-IP
 Version:        0.21
-Release:        4%{?dist}
+Release:        5%{?dist}
 Summary:        Drop-in replacement for IO::Socket::INET supporting both IPv4 and IPv6
 License:        GPL+ or Artistic
 Group:          Development/Libraries
 URL:            http://search.cpan.org/dist/IO-Socket-IP/
 Source0:        http://www.cpan.org/authors/id/P/PE/PEVANS/IO-Socket-IP-%{version}.tar.gz
 Patch0:         IO-Socket-IP-so_reuseport.patch
+# 1/2 Fix constructing sockets without specifying host or family, bug #1492760,
+# CPAN RT#91982, fixed in 0.25
+Patch1:         IO-Socket-IP-0.21-Ensure-that-a-Host-Family-less-constructor-still-con.patch
+# 2/2 Fix constructing sockets without specifying host or family, bug #1492760,
+# fixed in 0.29
+Patch2:         IO-Socket-IP-0.21-Correct-prototol-family-in-hints.patch
 BuildArch:      noarch
 BuildRequires:  perl
 BuildRequires:  perl(base)
@@ -35,6 +41,8 @@ arguments and methods are provided in a backward-compatible way.
 %prep
 %setup -q -n IO-Socket-IP-%{version}
 %patch0 -p1
+%patch1 -p1
+%patch2 -p1
 
 %build
 perl Build.PL installdirs=vendor
@@ -55,6 +63,9 @@ rm -f t/21nonblocking-connect-internet.t
 %{_mandir}/man3/*
 
 %changelog
+* Mon Sep 18 2017 Petr Pisar <ppisar@redhat.com> - 0.21-5
+- Fix constructing sockets without specifying host or family (bug #1492760)
+
 * Fri Dec 27 2013 Daniel Mach <dmach@redhat.com> - 0.21-4
 - Mass rebuild 2013-12-27
 

@@ -1,0 +1,83 @@
+From 0714c89c318afdc869a6b6e6fe0832dc63cd4ca7 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Petr=20P=C3=ADsa=C5=99?= <ppisar@redhat.com>
+Date: Mon, 18 Sep 2017 18:22:34 +0200
+Subject: [PATCH] Correct prototol family in hints
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+This corrects a warning about undefined protocol passed to Perl
+socket() function after applying the fix for a hostless constructor:
+
+$ ./Build test --verbose=1 --test_files t/19no-addrs.t
+t/19no-addrs.t ..
+ok 1 - $sock->fileno for Family => AF_INET
+ok 2 - $sock->sockdomain for Family => AF_INET
+ok 3 - $sock->socktype for Family => AF_INET
+ok 4 - $sock->fileno for Family => AF_INET6
+ok 5 - $sock->sockdomain for Family => AF_INET6
+ok 6 - $sock->socktype for Family => AF_INET6
+ok 7 - $sock->fileno for Type => SOCK_STREAM
+ok 8 - $sock->socktype for Type => SOCK_STREAM
+1..8
+Use of uninitialized value $protocol in socket at /usr/lib64/perl5/IO/Socket.pm line 81.
+ok
+All tests successful.
+
+This a port of upstream changes from 0.29 to 0.21 that were described
+as:
+
+0.29    2014/02/24 16:06:29
+        [BUGFIXES]
+         * Workaround for OSes that disobey AI_ADDRCONFIG and yield AIs on
+           families the kernel will not support anyway (e.g. HPUX)
+
+Signed-off-by: Petr Písař <ppisar@redhat.com>
+---
+ lib/IO/Socket/IP.pm | 21 ++++++++++++---------
+ 1 file changed, 12 insertions(+), 9 deletions(-)
+
+diff --git a/lib/IO/Socket/IP.pm b/lib/IO/Socket/IP.pm
+index 208d837..bea7d39 100644
+--- a/lib/IO/Socket/IP.pm
++++ b/lib/IO/Socket/IP.pm
+@@ -521,24 +521,27 @@ sub _configure
+    if( !@infos ) {
+ 
+       # If there was a Family hint then create a plain unbound, unconnected socket
++      if( defined $hints{family} ) {
++         @infos = ( {
++            family   => $hints{family},
++            socktype => $hints{socktype},
++            protocol => $hints{protocol},
++         } );
++      }
+       # If there wasn't, use getaddrinfo()'s AI_ADDRCONFIG side-effect to guess a
+       # suitable family first.
+-      if( !defined $hints{family} ) {
+-         my ( $err, $addrinfo ) = getaddrinfo( "", "0", \%hints );
++      else {
++         ( my $err, @infos ) = getaddrinfo( "", "0", \%hints );
+          if( $err ) {
+             $@ = "$err";
+             $! = EINVAL;
+             return;
+          }
+ 
+-         $hints{family} = $addrinfo->{family};
++         # We'll take all the @infos anyway, because some OSes (HPUX) are known to
++         # ignore the AI_ADDRCONFIG hint and return AF_INET6 even if they don't
++         # support them
+       }
+-
+-      @infos = ( {
+-         family   => $hints{family},
+-         socktype => $hints{socktype},
+-         protocol => $hints{protocol},
+-      } );
+    }
+ 
+    # In the nonblocking case, caller will be calling ->setup multiple times.
+-- 
+2.13.5
+
