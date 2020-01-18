@@ -1,6 +1,6 @@
 Name:           perl-IO-Socket-IP
 Version:        0.21
-Release:        3%{?dist}
+Release:        4%{?dist}
 Summary:        Drop-in replacement for IO::Socket::INET supporting both IPv4 and IPv6
 License:        GPL+ or Artistic
 Group:          Development/Libraries
@@ -55,6 +55,9 @@ rm -f t/21nonblocking-connect-internet.t
 %{_mandir}/man3/*
 
 %changelog
+* Fri Dec 27 2013 Daniel Mach <dmach@redhat.com> - 0.21-4
+- Mass rebuild 2013-12-27
+
 * Thu Jul 18 2013 Petr Šabata <contyk@redhat.com> - 0.21-3
 - Disable the SO_REUSEPORT test; koji builders don't support this feature yet
 
