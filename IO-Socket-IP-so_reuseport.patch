@@ -1,0 +1,12 @@
+diff --git a/t/11sockopts.t b/t/11sockopts.t
+index 02f733c..e11051a 100644
+--- a/t/11sockopts.t
++++ b/t/11sockopts.t
+@@ -28,6 +28,7 @@ TODO: {
+ SKIP: {
+    # Some OSes don't implement SO_REUSEPORT
+    skip "No SO_REUSEPORT", 1 unless defined eval { SO_REUSEPORT };
++   skip "Koji builders don't support SO_REUSEPORT", 1;
+ 
+    my $sock = IO::Socket::IP->new(
+       LocalHost => "127.0.0.1",
